@@ -12,7 +12,7 @@ namespace bgen {
 
 class Genotypes {
 public:
-  Genotypes() {}
+  Genotypes() : handle(nullptr), layout(0), compression(0), n_alleles(0), n_samples(0), file_offset(0), length(0), is_stdin(false), bit_depth(0), idx(0), uncompressed(nullptr), uncompressed_len(0), is_decompressed(false), ploidy(nullptr), constant_ploidy(true), has_ploidy(false) {}
   ~Genotypes() { clear_probs(); }
   void initialize(std::istream* _handle, 
            int lay,
@@ -65,6 +65,7 @@ private:
   std::uint32_t bit_depth=0;
   std::uint32_t idx=0;
   char * uncompressed={};
+  std::uint32_t uncompressed_len=0;
   bool is_decompressed = false;
   bool constant_ploidy=true;
   bool has_ploidy = false;

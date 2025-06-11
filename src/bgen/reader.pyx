@@ -31,6 +31,12 @@ cdef extern from "<iostream>" namespace "std":
         istream() except +
         void setstate(iostate state) except +
 
+cdef extern from "<fstream>" namespace "std":
+    cdef cppclass ifstream(istream):
+        ifstream() except +
+        ifstream(const string&) except +
+        ifstream(const string&, open_mode) except +
+
 cdef extern from 'variant.h' namespace 'bgen':
     cdef cppclass Variant:
         # declare class constructor and methods
@@ -292,7 +298,7 @@ cdef class BgenVar:
         self.__check_closed()
         cdef uint8_t * ploid = self.thisptr.ploidy()
         cdef uint64_t size = self.expected_n
-        cdef uint8_t[::1] arr = np.empty(size, dtype=np.uint8, order='C')
+        cdef uint8_t[::1] arr = np.zeros(size, dtype=np.uint8, order='C')
         memcpy(&arr[0], ploid, size)
         return arr
     @property
@@ -305,7 +311,7 @@ cdef class BgenVar:
         ''' dosage for the minor allele for a biallelic variant
         '''
         self.__check_closed()
-        cdef float[:] dose = np.empty(self.expected_n, dtype=np.float32, order='C')
+        cdef float[:] dose = np.zeros(self.expected_n, dtype=np.float32, order='C')
         self.thisptr.minor_allele_dosage(&dose[0])
         return np.asarray(dose)
     @property
@@ -313,7 +319,7 @@ cdef class BgenVar:
         ''' dosage for the alt allele for a biallelic variant
         '''
         self.__check_closed()
-        cdef float[:] dose = np.empty(self.expected_n, dtype=np.float32, order='C')
+        cdef float[:] dose = np.zeros(self.expected_n, dtype=np.float32, order='C')
         self.thisptr.alt_dosage(&dose[0])
         return np.asarray(dose)
     @property
@@ -329,7 +335,7 @@ cdef class BgenVar:
             ploidy = self.ploidy
             size = fast_ploidy_sum(&ploidy[0], n_samples) * cols
         
-        cdef float[:] arr = np.empty(size, dtype=np.float32, order='C')
+        cdef float[:] arr = np.zeros(size, dtype=np.float32, order='C')
         self.thisptr.probs_1d(&arr[0])
         
         cdef int current = 0
@@ -350,9 +356,8 @@ cdef class BgenVar:
                 data = np.reshape(arr, (-1, cols))
                 phase_width = data.shape[1]
                 
-                # create an empty array filled with nans
-                ragged = np.empty((len(ploidy), max_ploidy * cols))
-                ragged.fill(np.nan)
+                # create an array filled with nans
+                ragged = np.full((len(ploidy), max_ploidy * cols), np.nan)
                 
                 # fill in the empty array
                 for i, x in enumerate(ploidy):

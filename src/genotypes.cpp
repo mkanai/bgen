@@ -166,9 +166,12 @@ void Genotypes::decompress() {
   }
   
   std::uint32_t compressed_len = length - decompressed_field * 4;
-  char * compressed = new char[compressed_len];
-  uncompressed = new char[decompressed_len];
+  char * compressed = new char[compressed_len]();
+  uncompressed = new char[decompressed_len]();
+  uncompressed_len = decompressed_len;
   if (! handle->read(&compressed[0], compressed_len)) {
+    delete[] compressed;
+    delete[] uncompressed;
     throw std::invalid_argument("couldn't read the compressed data");
   }
 
@@ -258,7 +261,7 @@ void Genotypes::parse_ploidy() {
   }
   
   has_ploidy = true;
-  ploidy = new std::uint8_t[n_samples];
+  ploidy = new std::uint8_t[n_samples]();
   if (layout == 1) {
     std::memset(ploidy, max_ploidy, n_samples);
     return;
@@ -456,7 +459,16 @@ void Genotypes::probabilities_layout2(char * uncompressed, std::uint32_t idx, fl
       }
       remainder = 1.0;
       for (std::uint32_t x=0; x<n_probs; x++) {
-        prob = ((*reinterpret_cast<const std::uint64_t* >(&uncompressed[idx + bit_idx / 8]) >> bit_idx % 8) & probs_mask) * factor ;
+        // Ensure we don't read past the end of uncompressed data
+        std::uint32_t byte_offset = idx + bit_idx / 8;
+        if (byte_offset + sizeof(std::uint64_t) > uncompressed_len) {
+          // Handle edge case by reading only available bytes
+          std::uint64_t value = 0;
+          std::memcpy(&value, &uncompressed[byte_offset], std::min(sizeof(std::uint64_t), (size_t)(uncompressed_len - byte_offset)));
+          prob = ((value >> bit_idx % 8) & probs_mask) * factor;
+        } else {
+          prob = ((*reinterpret_cast<const std::uint64_t* >(&uncompressed[byte_offset]) >> bit_idx % 8) & probs_mask) * factor;
+        }
         bit_idx += bit_depth;
         remainder -= prob;
         probs[offset + x] = prob;
@@ -727,9 +739,25 @@ void Genotypes::ref_dosage_slow(char * uncompressed, std::uint32_t idx, float * 
       curr_ploidy = this->ploidy[n];
       half_ploidy = curr_ploidy / 2;
     }
-    hom = ((*reinterpret_cast<const std::uint64_t* >(&uncompressed[idx + bit_idx / 8]) >> bit_idx % 8) & probs_mask);
+    // Ensure we don't read past the end of uncompressed data
+    std::uint32_t byte_offset = idx + bit_idx / 8;
+    if (byte_offset + sizeof(std::uint64_t) > uncompressed_len) {
+      std::uint64_t value = 0;
+      std::memcpy(&value, &uncompressed[byte_offset], std::min(sizeof(std::uint64_t), (size_t)(uncompressed_len - byte_offset)));
+      hom = ((value >> bit_idx % 8) & probs_mask);
+    } else {
+      hom = ((*reinterpret_cast<const std::uint64_t* >(&uncompressed[byte_offset]) >> bit_idx % 8) & probs_mask);
+    }
     bit_idx += bit_depth;
-    het = ((*reinterpret_cast<const std::uint64_t* >(&uncompressed[idx + bit_idx / 8]) >> bit_idx % 8) & probs_mask);
+    
+    byte_offset = idx + bit_idx / 8;
+    if (byte_offset + sizeof(std::uint64_t) > uncompressed_len) {
+      std::uint64_t value = 0;
+      std::memcpy(&value, &uncompressed[byte_offset], std::min(sizeof(std::uint64_t), (size_t)(uncompressed_len - byte_offset)));
+      het = ((value >> bit_idx % 8) & probs_mask);
+    } else {
+      het = ((*reinterpret_cast<const std::uint64_t* >(&uncompressed[byte_offset]) >> bit_idx % 8) & probs_mask);
+    }
     bit_idx += bit_depth;
     dose[n] = ((hom * curr_ploidy) + het * half_ploidy) * factor;
     if (layout == 1) {
@@ -818,7 +846,13 @@ void Genotypes::get_allele_dosage(float * dose, bool use_alt, bool use_minor) {
 void Genotypes::clear_probs() {
   if (max_probs > 0) {
     delete[] ploidy;
+    ploidy = nullptr;
+  }
+  if (uncompressed != nullptr) {
     delete[] uncompressed;
+    uncompressed = nullptr;
+    uncompressed_len = 0;
+    is_decompressed = false;
   }
   max_probs = 0;
 }

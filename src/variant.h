@@ -17,7 +17,7 @@ class Variant {
   Genotypes geno = Genotypes();
 public:
   Variant(std::istream * _handle, std::uint64_t & varoffset, int layout, int compression, int expected_n, bool is_stdin=false);
-  Variant() {}
+  Variant() : geno(), handle(nullptr), offset(0), n_samples(0), pos(0), n_alleles(0), next_variant_offset(0) {}
   int probs_per_sample();
   void alt_dosage(float * dosage);
   void minor_allele_dosage(float * dosage);

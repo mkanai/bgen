@@ -18,7 +18,8 @@ namespace bgen {
 ///  @param layout bgen layout version (1 or 2)
 ///  @param compression compression scheme (0=no compression, 1=zlib, 2=zstd)
 ///  @param expected_n number of samples for variant
-Variant::Variant(std::istream * _handle, std::uint64_t & varoffset, int layout, int compression, int expected_n, bool is_stdin) : handle(_handle) {
+Variant::Variant(std::istream * _handle, std::uint64_t & varoffset, int layout, int compression, int expected_n, bool is_stdin) : 
+    geno(), handle(_handle), offset(0), n_samples(0), pos(0), n_alleles(0), next_variant_offset(0) {
   offset = varoffset;
   if (!is_stdin) {
     handle->clear();
@@ -45,10 +46,10 @@ Variant::Variant(std::istream * _handle, std::uint64_t & varoffset, int layout, 
   }
   
   // get the variant ID (first need to know how long the field is)
-  std::uint16_t item_len;
+  std::uint16_t item_len = 0;
   handle->read(reinterpret_cast<char*>(&item_len), sizeof(std::uint16_t));
   if (item_len > 0) {
-    varid.resize(item_len);
+    varid.resize(item_len, '\0');  // Initialize with null characters
     handle->read(&varid[0], item_len);
   }
   
@@ -59,20 +60,23 @@ Variant::Variant(std::istream * _handle, std::uint64_t & varoffset, int layout, 
   }
   
   // get the rsID (first need to know how long the field is)
+  item_len = 0;
   handle->read(reinterpret_cast<char*>(&item_len), sizeof(std::uint16_t));
   if (item_len > 0) {
-    rsid.resize(item_len);
+    rsid.resize(item_len, '\0');  // Initialize with null characters
     handle->read(&rsid[0], item_len);
   }
   
   // get the chromosome (first need to know how long the field is)
+  item_len = 0;
   handle->read(reinterpret_cast<char*>(&item_len), sizeof(std::uint16_t));
   if (item_len > 0) {
-    chrom.resize(item_len);
+    chrom.resize(item_len, '\0');  // Initialize with null characters
     handle->read(&chrom[0], item_len);
   }
   
   handle->read(reinterpret_cast<char*>(&pos), sizeof(std::uint32_t));
+  
   if (layout == 1) {
     n_alleles = 2;
   } else {
@@ -80,15 +84,17 @@ Variant::Variant(std::istream * _handle, std::uint64_t & varoffset, int layout, 
   }
   
   for (int x=0; x < n_alleles; x++) {
-    std::uint32_t allele_len;
+    std::uint32_t allele_len = 0;
     std::string allele;
     handle->read(reinterpret_cast<char*>(&allele_len), sizeof(std::uint32_t));
-    allele.resize(allele_len);
-    handle->read(&allele[0], allele_len);
+    if (allele_len > 0) {
+      allele.resize(allele_len, '\0');  // Initialize with null characters
+      handle->read(&allele[0], allele_len);
+    }
     alleles.push_back(allele);
   }
   
-  std::uint32_t length;
+  std::uint32_t length = 0;
   if ((layout == 1) && (compression == 0)) {
     length = n_samples * 6;
   } else {
