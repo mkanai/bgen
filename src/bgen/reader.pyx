@@ -92,6 +92,7 @@ cdef extern from 'reader.h' namespace 'bgen':
         vector[string] rsids()
         vector[string] chroms()
         vector[uint32_t] positions()
+        vector[Variant] read_variants_at_offsets(const vector[uint64_t]& offsets) except +
         
         # declare public attributes
         istream * handle
@@ -634,6 +635,39 @@ cdef class BgenReader:
         self.close()
         return False
     
+    def read_variants_at_offsets(self, offsets):
+        ''' Read variants at specific file offsets
+
+        Args:
+            offsets: list or array of file offsets (uint64)
+
+        Returns:
+            list of BgenVar objects
+        '''
+        if not self.is_open == True:
+            raise ValueError("bgen file is closed")
+
+        # Convert Python list/array to C++ vector
+        cdef vector[uint64_t] cpp_offsets
+        for offset in offsets:
+            cpp_offsets.push_back(offset)
+
+        # Call C++ method
+        cdef vector[Variant] cpp_variants = self.thisptr.read_variants_at_offsets(cpp_offsets)
+
+        # Convert C++ variants to Python BgenVar objects
+        cdef list py_variants = []
+        cdef int i
+        cdef Variant* var_ptr
+        for i in range(cpp_variants.size()):
+            # Create BgenVar with the same parameters used elsewhere
+            var_ptr = &cpp_variants[i]
+            py_var = BgenVar(self.handle, var_ptr.offset, self.thisptr.header.layout,
+                           self.thisptr.header.compression, self.thisptr.header.nsamples,
+                           self.is_stdin, self.is_open)
+            py_variants.append(py_var)
+
+        return py_variants
     def close(self):
         if self.is_open == True:
             del self.thisptr

@@ -18,6 +18,7 @@ public:
   void parse_all_variants();
   Variant next_var();
   void drop_variants(std::vector<int> indices);
+  std::vector<Variant> read_variants_at_offsets(const std::vector<std::uint64_t>& offsets);
   std::istream * handle;
   std::vector<std::string> varids();
   std::vector<std::string> rsids();

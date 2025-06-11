@@ -120,4 +120,37 @@ std::vector<std::uint32_t> CppBgenReader::positions() {
   return position;
 }
 
+/// read variants at specific file offsets
+std::vector<Variant> CppBgenReader::read_variants_at_offsets(const std::vector<std::uint64_t>& offsets) {
+  if (is_stdin) {
+    throw std::invalid_argument("cannot seek to offsets when reading from stdin");
+  }
+
+  std::vector<Variant> result;
+  result.reserve(offsets.size());
+
+  // Cast to ifstream to use seekg
+  std::ifstream* file_handle = static_cast<std::ifstream*>(handle);
+
+  for (std::uint64_t file_offset : offsets) {
+    // Seek to the specific offset
+    file_handle->clear(); // Clear any error flags
+    file_handle->seekg(file_offset, std::ios::beg);
+
+    if (file_handle->fail()) {
+      throw std::runtime_error("failed to seek to offset " + std::to_string(file_offset));
+    }
+
+    // Read variant at this position
+    try {
+      Variant var(handle, file_offset, header.layout, header.compression, header.nsamples, is_stdin);
+      result.push_back(std::move(var));
+    } catch (const std::exception& e) {
+      throw std::runtime_error("failed to read variant at offset " + std::to_string(file_offset) + ": " + e.what());
+    }
+  }
+
+  return result;
+}
+
 } // namespace bgen
