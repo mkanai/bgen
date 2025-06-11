@@ -30,6 +30,7 @@ public:
       file_offset = _offset;
       length = _length;
       is_stdin = _is_stdin;
+      missing.clear();  // Clear any previous missing indices
       if (is_stdin) {
         load_data_and_parse_header();
       }

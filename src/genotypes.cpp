@@ -212,6 +212,7 @@ void Genotypes::load_data_and_parse_header() {
     return;
   }
   idx = 0;
+  missing.clear();  // Clear missing indices from previous variants
   if (layout == 1) {
     phased = false;
     min_ploidy = 2;
@@ -855,6 +856,8 @@ void Genotypes::clear_probs() {
     is_decompressed = false;
   }
   max_probs = 0;
+  has_ploidy = false;
+  missing.clear();  // Clear missing indices
 }
 
 } //namespace bgen
